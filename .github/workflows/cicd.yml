@@ -1,4 +1,4 @@
-name: CI/CD for Dockerized Flask App
+name: CI – Build & Test Docker Image
 
 on:
   push:
@@ -7,58 +7,31 @@ on:
     branches: [ main ]
 
 jobs:
-  dockerbuild:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Build The Docker Image
-      run: docker build . --file DockerImage --tag workflow-test:$(date +%s)
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      # 1. Checkout your code
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11.4'
+      # 2. Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flask
-        pip install pytest
+      # 3. Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Run tests
-      run: |
-        pytest
+      # 4. Build the Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t your-username/your-repo:latest .
 
-  build-and-publish:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: ./DockerImage
-        push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/flask-app:latest
-
-    - name: Image digest
-      run: echo ${{ steps.build-and-publish.outputs.digest }}
+      # 5. Run tests inside the container
+      - name: Run pytest in container
+        run: |
+          docker run --rm your-username/your-repo:latest pytest --maxfail=1 --disable-warnings -q
